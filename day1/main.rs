@@ -1,18 +1,18 @@
-use std::fs;
 use std::collections::HashMap;
-
+use std::fs;
 
 #[derive(Debug)]
-struct Inp{
-    left : Vec<i32>,
-    right : Vec<i32>
+struct Inp {
+    left: Vec<i32>,
+    right: Vec<i32>,
 }
 
-fn read_file(filename: &str ) -> Inp {
-
-    let mut res =    Inp{ left: vec![], right: vec![]};
-    let contents = fs::read_to_string(filename)
-        .expect("Something went wrong reading the file");
+fn read_file(filename: &str) -> Inp {
+    let mut res = Inp {
+        left: vec![],
+        right: vec![],
+    };
+    let contents = fs::read_to_string(filename).expect("Something went wrong reading the file");
     contents.lines().for_each(|line| {
         let mut parts = line.split("   ");
         let left = parts.next().unwrap().parse::<i32>().unwrap();
@@ -20,7 +20,7 @@ fn read_file(filename: &str ) -> Inp {
         res.left.push(left);
         res.right.push(right);
     });
-    return res
+    return res;
 }
 
 impl Inp {
@@ -29,7 +29,7 @@ impl Inp {
         for i in 0..self.left.len() {
             res += (self.left[i] - self.right[i]).abs();
         }
-        return res
+        return res;
     }
     fn metrics2(&self) -> i32 {
         let mut res: i32 = 0;
@@ -39,10 +39,25 @@ impl Inp {
             freqs.entry(*v).and_modify(|e| *e += 1).or_insert(1);
         }
         for i in &self.left {
-            res += i*freqs.get(i).unwrap_or(&0);
+            res += i * freqs.get(i).unwrap_or(&0);
         }
 
-        return res
+        return res;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let mut Inp = read_file("test.txt");
+        Inp.left.sort();
+        Inp.right.sort();
+        let result = Inp.metrics();
+        assert_eq!(result, 11);
+        assert_eq!(Inp.metrics2(), 31);
     }
 }
 
@@ -52,5 +67,4 @@ fn main() {
     v.right.sort();
     println!("Part1 {:?}", v.metrics());
     println!("Part2 {:?}", v.metrics2());
-
 }
