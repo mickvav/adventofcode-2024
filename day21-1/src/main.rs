@@ -1,6 +1,4 @@
 use memoize::memoize;
-use regex::Regex;
-use std::collections::HashMap;
 use std::fs;
 
 #[derive(Debug)]
@@ -16,12 +14,27 @@ fn read_file(filename: &str) -> Inp {
     return inp;
 }
 
-fn testseq(s: String, d: i32) -> i64 {
+fn testseq(s: String, d: i32, trace: bool) -> i64 {
     let mut res = 0;
+    let mut tracedchars = Vec::new();
     let mut p = 'A';
     for i in 0..s.len() {
-        res += buttons(s.chars().nth(i).unwrap(), p, d);
+        let (b, mut t) = buttons(s.chars().nth(i).unwrap(), p, d, trace);
+        tracedchars.append(&mut t);
+        res += b;
         p = s.chars().nth(i).unwrap();
+    }
+    if trace {
+        println!("tracelen: {}", tracedchars.len());
+        println!(
+            "trace: {}",
+            tracedchars
+                .iter()
+                .map(char::to_string)
+                .collect::<Vec<String>>()
+                .join("")
+                .to_string()
+        );
     }
     println!("{}", res);
     return res;
@@ -30,23 +43,32 @@ fn testseq(s: String, d: i32) -> i64 {
 //  < v >
 //
 
-fn pickpath(options: Vec<Vec<char>>, d: i32) -> i64 {
+fn pickpath(options: Vec<Vec<char>>, d: i32, trace: bool) -> (i64, Vec<char>) {
+    let mut chars: Vec<char> = Vec::new();
     let mut minlength = usize::MAX;
 
     let mut res = 0;
     for o in options {
         let mut tmp: i64 = 0;
         let mut p = 'A';
+        let mut tmpchars = Vec::new();
         for c in o {
-            tmp += buttons(c, p, d);
+            let (t, mut b) = buttons(c, p, d, trace);
+            tmp += t;
+            if trace {
+                tmpchars.append(&mut b);
+            }
             p = c;
         }
         if (tmp as usize) < minlength {
             minlength = tmp as usize;
             res = tmp;
+            if trace {
+                chars = tmpchars;
+            }
         }
     }
-    return res;
+    return (res, chars);
 }
 
 #[memoize]
@@ -117,10 +139,10 @@ fn paths(t: (char, char)) -> Vec<Vec<char>> {
             ];
         }
         ('0', '8') => {
-            return vec![vec!['^', '^', '^']];
+            return vec![vec!['^', '^', '^', 'A']];
         }
         ('8', '0') => {
-            return vec![vec!['v', 'v', 'v']];
+            return vec![vec!['v', 'v', 'v', 'A']];
         }
         ('0', '9') => {
             return vec![
@@ -525,177 +547,93 @@ fn paths(t: (char, char)) -> Vec<Vec<char>> {
     }
 }
 #[memoize]
-fn buttons(t: char, s: char, d: i32) -> i64 {
-    //let mut res = Vec::new();
-    let mut res: i64 = 0;
+fn buttons(t: char, s: char, d: i32, trace: bool) -> (i64, Vec<char>) {
+    let mut reschars = Vec::new();
+    let res: i64;
     if d == 0 {
-        return 1; //vec![t];
+        if trace {
+            reschars.push(t);
+        }
+        return (1, reschars);
     }
     if s == t {
-        return 1; //vec!['A'];
+        if trace {
+            reschars.push('A');
+        }
+        return (1, reschars);
     }
     match (s, t) {
         ('A', '^') => {
             //res.append(&mut buttons('<', 'A', d - 1));
             //res.append(&mut buttons('A', '<', d - 1));
-            res += buttons('<', 'A', d - 1);
-            res += buttons('A', '<', d - 1);
+            (res, reschars) = pickpath(vec![vec!['<', 'A']], d - 1, trace);
         }
         ('A', '>') => {
             //res.append(&mut buttons('v', 'A', d - 1));
             //res.append(&mut buttons('A', 'v', d - 1));
-            res += buttons('v', 'A', d - 1);
-            res += buttons('A', 'v', d - 1);
+            (res, reschars) = pickpath(vec![vec!['v', 'A']], d - 1, trace);
         }
         ('A', 'v') => {
-            let mut v1 = buttons('<', 'A', d - 1);
+            (res, reschars) =
+                pickpath(vec![vec!['<', 'v', 'A'], vec!['v', '<', 'A']], d - 1, trace);
             //v1.append(&mut buttons('v', '<', d - 1));
             //v1.append(&mut buttons('A', 'v', d - 1));
-            v1 += buttons('v', '<', d - 1);
-            v1 += buttons('A', 'v', d - 1);
-            let mut v2 = buttons('v', 'A', d - 1);
             //v2.append(&mut buttons('<', 'v', d - 1));
             //v2.append(&mut buttons('A', '<', d - 1));
-            v2 += buttons('<', 'v', d - 1);
-            v2 += buttons('A', '<', d - 1);
-            if v1 > v2 {
-                res = v2;
-            } else {
-                res = v1;
-            }
         }
         ('A', '<') => {
-            let mut v1 = buttons('<', 'A', d - 1);
-            v1 += buttons('v', '<', d - 1);
-            v1 += buttons('<', 'v', d - 1);
-            v1 += buttons('A', '<', d - 1);
-            let mut v2 = buttons('v', 'A', d - 1);
-            v2 += buttons('<', 'v', d - 1);
-            v2 += buttons('<', '<', d - 1);
-            v2 += buttons('A', '<', d - 1);
-            if v1 > v2 {
-                return v2;
-            } else {
-                return v1;
-            };
+            (res, reschars) = pickpath(
+                vec![vec!['<', 'v', '<', 'A'], vec!['v', '<', '<', 'A']],
+                d - 1,
+                trace,
+            );
         }
         ('^', 'A') => {
-            res += buttons('>', 'A', d - 1);
-            res += buttons('A', '>', d - 1);
+            (res, reschars) = pickpath(vec![vec!['>', 'A']], d - 1, trace);
         }
-        ('^', '^') => return buttons('A', 'A', d - 1),
-        ('^', 'v') => {
-            res += buttons('v', 'A', d - 1);
-            res += buttons('A', 'v', d - 1);
-        }
+        ('^', '^') => return buttons('A', 'A', d - 1, trace),
+        ('^', 'v') => return pickpath(vec![vec!['v', 'A']], d - 1, trace),
+
         ('^', '>') => {
-            let mut v1 = buttons('>', 'A', d - 1);
-            v1 += buttons('v', '>', d - 1);
-            v1 += buttons('A', 'v', d - 1);
-            let mut v2 = buttons('v', 'A', d - 1);
-            v2 += buttons('>', 'v', d - 1);
-            v2 += buttons('A', '>', d - 1);
-            if v1 > v2 {
-                return v2;
-            } else {
-                return v1;
-            }
-        }
-        ('^', '<') => {
-            res += buttons('v', 'A', d - 1);
-            res += buttons('<', 'v', d - 1);
-            res += buttons('A', '<', d - 1);
-        }
-        ('>', 'A') => {
-            res += buttons('^', 'A', d - 1);
-            res += buttons('A', '^', d - 1);
-        }
-        ('>', '>') => return buttons('A', 'A', d - 1),
-        ('>', 'v') => {
-            res += buttons('<', 'A', d - 1);
-            res += buttons('A', '<', d - 1);
-        }
-        ('>', '<') => {
-            res += buttons('<', 'A', d - 1);
-            res += buttons('<', '<', d - 1);
-            res += buttons('A', '<', d - 1);
-        }
-        ('>', '^') => {
-            let mut v1 = buttons('^', 'A', d - 1);
-            v1 += buttons('<', '^', d - 1);
-            v1 += (buttons('A', '<', d - 1));
-            let mut v2 = buttons('<', 'A', d - 1);
-            v2 += (buttons('^', '<', d - 1));
-            v2 += (buttons('A', '^', d - 1));
-            if v1 > v2 {
-                return v2;
-            } else {
-                return v1;
-            }
-        }
-        ('<', 'A') => {
-            let mut v1 = buttons('>', 'A', d - 1);
-            v1 += (buttons('>', '>', d - 1));
-            v1 += (buttons('^', '>', d - 1));
-            v1 += (buttons('A', '^', d - 1));
-            let mut v2 = buttons('>', 'A', d - 1);
-            v2 += (buttons('^', '>', d - 1));
-            v2 += (buttons('>', '^', d - 1));
-            v2 += (buttons('A', '>', d - 1));
-            if v1 > v2 {
-                return v2;
-            } else {
-                return v1;
-            }
-        }
-        ('<', '<') => return buttons('A', 'A', d - 1),
-        ('<', 'v') => {
-            res += (buttons('>', 'A', d - 1));
-            res += (buttons('A', '>', d - 1));
-        }
-        ('<', '^') => {
-            res += (buttons('>', 'A', d - 1));
-            res += (buttons('^', '>', d - 1));
-            res += (buttons('A', '^', d - 1));
-        }
-        ('<', '>') => {
-            res += (buttons('>', 'A', d - 1));
-            res += (buttons('>', '>', d - 1));
-            res += (buttons('A', '>', d - 1));
-        }
-        ('v', 'A') => {
-            let mut v1 = buttons('^', 'A', d - 1);
-            v1 += (buttons('>', '^', d - 1));
-            v1 += (buttons('A', '>', d - 1));
-            let mut v2 = buttons('>', 'A', d - 1);
-            v2 += (buttons('^', '>', d - 1));
-            v2 += (buttons('A', '^', d - 1));
-            if v1 > v2 {
-                return v2;
-            } else {
-                return v1;
-            }
-        }
-        ('v', 'v') => return buttons('A', 'A', d - 1),
-        ('v', '<') => {
-            res += (buttons('<', 'A', d - 1));
-            res += (buttons('A', '<', d - 1));
-        }
-        ('v', '^') => {
-            res += (buttons('^', 'A', d - 1));
-            res += (buttons('A', '^', d - 1));
-        }
-        ('v', '>') => {
-            res += (buttons('>', 'A', d - 1));
-            res += (buttons('A', '>', d - 1));
+            return pickpath(vec![vec!['>', 'v', 'A'], vec!['v', '>', 'A']], d - 1, trace)
         }
 
+        ('^', '<') => {
+            return pickpath(vec![vec!['v', '<', 'A']], d - 1, trace);
+        }
+        ('>', 'A') => {
+            return pickpath(vec![vec!['^', 'A']], d - 1, trace);
+        }
+        ('>', '>') => return buttons('A', 'A', d - 1, trace),
+        ('>', 'v') => return pickpath(vec![vec!['<', 'A']], d - 1, trace),
+        ('>', '<') => return pickpath(vec![vec!['<', '<', 'A']], d - 1, trace),
+        ('>', '^') => {
+            return pickpath(vec![vec!['^', '<', 'A'], vec!['<', '^', 'A']], d - 1, trace)
+        }
+        ('<', 'A') => {
+            return pickpath(
+                vec![vec!['>', '>', '^', 'A'], vec!['>', '^', '>', 'A']],
+                d - 1,
+                trace,
+            )
+        }
+        ('<', '<') => return buttons('A', 'A', d - 1, trace),
+        ('<', 'v') => return pickpath(vec![vec!['>', 'A']], d - 1, trace),
+        ('<', '^') => return pickpath(vec![vec!['>', '^', 'A']], d - 1, trace),
+        ('<', '>') => return pickpath(vec![vec!['>', '>', 'A']], d - 1, trace),
+        ('v', 'A') => {
+            return pickpath(vec![vec!['^', '>', 'A'], vec!['>', '^', 'A']], d - 1, trace)
+        }
+        ('v', 'v') => return buttons('A', 'A', d - 1, trace),
+        ('v', '<') => return pickpath(vec![vec!['<', 'A']], d - 1, trace),
+        ('v', '^') => return pickpath(vec![vec!['^', 'A']], d - 1, trace),
+        ('v', '>') => return pickpath(vec![vec!['>', 'A']], d - 1, trace),
         t => {
-            return pickpath(paths(t), d - 1);
+            return pickpath(paths(t), d - 1, trace);
         }
     }
 
-    return res;
+    return (res, reschars);
 }
 
 impl Inp {
@@ -703,7 +641,7 @@ impl Inp {
         let mut res = 0;
         for line in &self.lines {
             let base = line.as_str().trim_matches('A').parse::<i64>().unwrap();
-            let c = testseq(line.to_string(), 3);
+            let c = testseq(line.to_string(), 3, true);
             res += (c as i64) * base;
         }
         return res;
@@ -712,7 +650,7 @@ impl Inp {
         let mut res = 0;
         for line in &self.lines {
             let base = line.as_str().trim_matches('A').parse::<i64>().unwrap();
-            let c = testseq(line.to_string(), 26);
+            let c = testseq(line.to_string(), 26, false);
             res += (c as i64) * base;
         }
 
@@ -726,7 +664,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        assert_eq!(read_file("test.txt").metrics(), 161);
+        assert_eq!(read_file("test.txt").metrics(), 126384);
     }
 }
 
